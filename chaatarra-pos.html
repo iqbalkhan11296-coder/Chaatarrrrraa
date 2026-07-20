@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CHAATARRA POS (58mm)</title>
+<style>
+  :root{--burgundy:#4b0f1a;--gold:#d4af37}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--burgundy);color:#fff}
+  header{padding:14px 18px;border-bottom:2px solid var(--gold);display:flex;justify-content:space-between;align-items:center}
+  h1{margin:0;color:var(--gold);font-size:22px;letter-spacing:1px}
+  .wrap{display:flex;min-height:calc(100vh - 60px)}
+  .left{flex:1;padding:18px}
+  .right{width:380px;background:#fff;color:#000;padding:16px;display:flex;flex-direction:column}
+
+  .section-title{color:var(--gold);margin:8px 0 10px 2px;font-weight:bold}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  button.item{padding:18px;border:none;border-radius:12px;background:var(--gold);color:var(--burgundy);font-weight:700;font-size:16px;cursor:pointer}
+
+  .bill{flex:1;overflow:auto;border:1px dashed #aaa;padding:8px}
+  .bill-row{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;margin:6px 0}
+  .qty-btn{padding:4px 8px;border:1px solid #999;background:#eee;cursor:pointer}
+  .remove{color:#b00020;cursor:pointer;font-weight:bold}
+
+  .total{border-top:2px dashed #000;margin-top:8px;padding-top:8px;font-size:20px;font-weight:700}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .actions button{padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer}
+  .print{background:var(--burgundy);color:#fff}
+  .clear{background:#777;color:#fff}
+  .report{grid-column:span 2;background:var(--gold);color:var(--burgundy)}
+
+  @media print{
+    body *{visibility:hidden}
+    #printArea, #printArea *{visibility:visible}
+    #printArea{position:absolute;left:0;top:0;width:58mm}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>CHAATARRA POS</h1>
+  <div id="clock"></div>
+</header>
+
+<div class="wrap">
+  <div class="left">
+    <div class="section-title">CHAATS</div>
+    <div class="grid">
+      <button class="item" onclick="addItem('Pani Puri',45)">Pani Puri ₹45</button>
+      <button class="item" onclick="addItem('Masala Puri',55)">Masala Puri ₹55</button>
+      <button class="item" onclick="addItem('Samoosa Chaat',60)">Samoosa Chaat ₹60</button>
+      <button class="item" onclick="addItem('Cold Coffee',45)">Cold Coffee ₹45</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="bill" id="bill"></div>
+    <div class="total">Total: ₹<span id="total">0</span></div>
+
+    <div class="actions">
+      <button class="print" onclick="printBill()">PRINT BILL</button>
+      <button class="clear" onclick="clearBill()">CLEAR</button>
+      <button class="report" onclick="showReport()">TODAY SALES</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea" style="font-family:monospace;font-size:12px">
+  <center>
+    <b>CHAATARRA</b><br/>
+    ------------------------------
+  </center>
+  <div id="printItems"></div>
+  <div>------------------------------</div>
+  <div><b>Total: ₹<span id="printTotal"></span></b></div>
+  <div id="printDate"></div>
+  <center>Thank You! Visit Again</center>
+</div>
+
+<script>
+let cart = [];
+
+function updateClock(){
+  document.getElementById('clock').innerText = new Date().toLocaleString();
+}
+setInterval(updateClock,1000); updateClock();
+
+function addItem(name, price){
+  const found = cart.find(i=>i.name===name);
+  if(found){found.qty+=1}
+  else{cart.push({name, price, qty:1})}
+  renderBill();
+}
+
+function changeQty(index, delta){
+  cart[index].qty += delta;
+  if(cart[index].qty<=0) cart.splice(index,1);
+  renderBill();
+}
+
+function removeItem(index){
+  cart.splice(index,1);
+  renderBill();
+}
+
+function renderBill(){
+  const bill = document.getElementById('bill');
+  bill.innerHTML='';
+  let total=0;
+
+  cart.forEach((item,i)=>{
+    const row=document.createElement('div');
+    row.className='bill-row';
+    const lineTotal = item.price*item.qty;
+    total += lineTotal;
+
+    row.innerHTML=`
+      <div>${item.name}</div>
+      <div>
+        <button class='qty-btn' onclick='changeQty(${i},-1)'>-</button>
+        ${item.qty}
+        <button class='qty-btn' onclick='changeQty(${i},1)'>+</button>
+      </div>
+      <div>₹${lineTotal}</div>
+      <div class='remove' onclick='removeItem(${i})'>×</div>
+    `;
+    bill.appendChild(row);
+  });
+
+  document.getElementById('total').innerText=total;
+}
+
+function clearBill(){ cart=[]; renderBill(); }
+
+function saveSale(total){
+  const today = new Date().toLocaleDateString();
+  const data = JSON.parse(localStorage.getItem('sales')||'{}');
+  data[today] = (data[today]||0) + total;
+  localStorage.setItem('sales', JSON.stringify(data));
+}
+
+function showReport(){
+  const today = new Date().toLocaleDateString();
+  const data = JSON.parse(localStorage.getItem('sales')||'{}');
+  alert(`Today's Sales: ₹${data[today]||0}`);
+}
+
+function printBill(){
+  let items=''; let total=0;
+  cart.forEach(item=>{
+    const line = item.price*item.qty;
+    total+=line;
+    items+=`${item.name} x${item.qty}  ₹${line}<br/>`;
+  });
+
+  document.getElementById('printItems').innerHTML=items;
+  document.getElementById('printTotal').innerText=total;
+  document.getElementById('printDate').innerText=new Date().toLocaleString();
+
+  saveSale(total);
+  window.print();
+}
+</script>
+</body>
+</html>
